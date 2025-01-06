@@ -53,7 +53,7 @@ class Buku extends Model
     }
 
 
-    public function scopeWithAvgRating(Builder $query, $from = null, $to = null): Builder|QueryBuilder
+     public function scopeWithAvgRating(Builder $query, $from = null, $to = null): Builder|QueryBuilder
     {
         return $query->withAvg(['ulasan' => function(Builder $q) use ($from, $to) {
             if ($from) {

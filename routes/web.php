@@ -1,21 +1,23 @@
 <?php
 
-use App\Http\Controllers\dendaController;
-use App\Http\Controllers\koleksiController;
-use App\Http\Middleware\DashboardAuth;
+use App\Mail\NotificationMail;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\CekStatusBuku;
+use App\Http\Middleware\DashboardAuth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BukuController;
 use App\Http\Controllers\MainController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\AdminMiddleware;
+use App\Http\Controllers\dendaController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\koleksiController;
 use App\Http\Controllers\LaporanController;
 use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\PeminjamController;
 use App\Http\Controllers\LogAktivitasController;
 use App\Http\Controllers\pengembalianController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 
 Route::get('/', [MainController::class, 'index'])->name('home')->middleware(DashboardAuth::class);
 Route::get('/peminjamanBuku/{Fadly_id}', [MainController::class, 'show'])->name('peminjaman.user.index')->middleware('auth');
@@ -32,7 +34,7 @@ Route::put('/listPeminjaman/{id}/return', [pengembalianController::class, 'retur
 Route::get('/reviews/{peminjamanId}/create', [ReviewController::class, 'create'])->name('review.create');
 Route::post('/reviews/store', [ReviewController::class, 'store'])->name('review.store');
 
-Route::middleware('guest')->group(function () {
+Route::middleware(['guest'])->group(function () {
     Route::get('/register', [AuthController::class, 'registerForm'])->name('register');
     Route::post('/register', [AuthController::class, 'register']);
     Route::get('/login', [AuthController::class, 'loginForm'])->name('login');
@@ -41,7 +43,7 @@ Route::middleware('guest')->group(function () {
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::middleware(['auth', 'verified', AdminMiddleware::class])->group(function () {
+Route::middleware(['auth',  AdminMiddleware::class])->group(function () {
     // dashboard index
     // Route::get('/dashboard', fn() => view('admin.index'))->name('dashboard');
 
@@ -99,4 +101,15 @@ Route::middleware(['auth', 'verified', AdminMiddleware::class])->group(function 
 
     Route::get('/denda', [dendaController::class, 'index'])->name('denda.index');
     Route::post('/denda/{Fadly_id}', [dendaController::class, 'bayar'])->name('denda.bayar');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/email/verify', [AuthController::class, 'verify'])
+        ->name('verification.verify');
+
+    Route::post('/email/notification', [AuthController::class, 'verifyOTP'])
+        // ->middleware('throttle:6,1')
+        ->name('verification.send');
+
+    Route::post('/email/resend', [AuthController::class, 'resendOTP'])->name('verification.resend');
 });

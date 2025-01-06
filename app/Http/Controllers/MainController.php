@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Notifications\NotificationEmail;
 use Carbon\Carbon;
 use App\Models\Buku;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Models\Peminjaman;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+use Notification;
 use function Laravel\Prompts\error;
 use Illuminate\Support\Facades\Auth;
 
@@ -124,5 +126,16 @@ class MainController extends Controller
         ]);
 
         return redirect()->back()->with('success', $message);
+    }
+
+    public function mail()
+    {
+        $user = User::get();
+        $data = "ini adalah contoh data";
+        Notification::send($user, new NotificationEmail($data));
+
+        return response()->json([
+            'message' => 'Notifikasi berhasil dikirim'
+        ]);
     }
 }

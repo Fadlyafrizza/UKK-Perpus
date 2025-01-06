@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Traits\UserTrait;
 use Carbon\Carbon;
 use App\Models\User;
 use App\Enums\RolesUser;
+use App\Traits\UserTrait;
 use Illuminate\Http\Request;
+use App\Mail\NotificationMail;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-
     use UserTrait;
 
     public function loginForm()
@@ -53,7 +55,6 @@ class AuthController extends Controller
             } else {
                 return redirect()->intended('/');
             }
-
         } else {
             return back()->withErrors([
                 'email' => 'Email atau password salah.',
@@ -61,12 +62,10 @@ class AuthController extends Controller
         }
     }
 
-
     public function registerForm()
     {
         return view('auth.register');
     }
-
 
     public function register(Request $Fadly_request)
     {
@@ -89,18 +88,79 @@ class AuthController extends Controller
             'Email' => $Fadly_request->email,
             'Password' => Hash::make($Fadly_request->password),
             'NamaLengkap' => $Fadly_request->NamaLengkap,
-            'Alamat' => $Fadly_request->Alamat
+            'Alamat' => $Fadly_request->Alamat,
+            'verified' => 0
         ]);
 
         $Fadly_user->assignRole(RolesUser::USER);
 
-        return redirect()->route('home');
+        Auth::login($Fadly_user);
+
+        $data = $this->generateOTP();
+        $this->sendOTP($Fadly_user, $data);
+
+        return redirect()->route('verification.verify')
+            ->with('message', 'Silakan cek email Anda untuk kode verifikasi.');
     }
 
+    public function verify(Request $request)
+    {
+        $user = Auth::user();
+
+        return view('email.verify', compact('user'));
+    }
+
+    protected function generateOTP()
+    {
+        return str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+    }
+
+    public function verifyOTP(Request $Fadly_request)
+    {
+        $Fadly_request->validate([
+            'otp' => 'required|string|size:4',
+        ]);
+
+        $Fadly_user = Auth::user();
+        $Fadly_cacheKey = 'otp_' . $Fadly_user->id;
+        $Fadly_storedOTP = Cache::get($Fadly_cacheKey);
+
+        if (!$Fadly_storedOTP || $Fadly_storedOTP !== $Fadly_request->otp) {
+            return back()->withErrors([
+                'otp' => 'Kode verifikasi tidak valid atau sudah kadaluarsa.'
+            ]);
+        }
+
+        Cache::forget($Fadly_cacheKey);
+
+        $Fadly_user->update(['verified' => 1]);
+
+        return redirect()->route('login')
+            ->with('success', 'Email berhasil diverifikasi! Silakan login.');
+    }
+
+    public function resendOTP(Request $Fadly_request)
+    {
+        $Fadly_user = Auth::user();
+        $data = $this->generateOTP();
+        $this->sendOTP($Fadly_user, $data);
+
+        return back()->with('message', 'Kode verifikasi baru telah dikirim ke email Anda.');
+    }
+
+    public function sendOTP($user, $otp)
+    {
+        $cacheKey = 'otp_' . $user->id;
+        Cache::put($cacheKey, $otp, now()->addMinutes(15));
+
+        Mail::to($user->Email)->send(new NotificationMail([
+            'subject' => 'Kode Verifikasi Email',
+            'code' => "Kode verifikasi Anda adalah: $otp\nKode ini akan kadaluarsa dalam 15 menit."
+        ]));
+    }
 
     public function logout(Request $Fadly_request)
     {
-
         if (!Auth::user()->isAdmin()) {
             $this->logActivity('petugas logout', [
                 'Username' => Auth::user()->Username,
@@ -111,7 +171,6 @@ class AuthController extends Controller
         Auth::logout();
         $Fadly_request->session()->invalidate();
         $Fadly_request->session()->regenerateToken();
-
 
         return redirect('/');
     }

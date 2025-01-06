@@ -12,6 +12,6 @@ trait UserTrait
             'UserID' => auth()->id(),
             'aksi' => $aksi,
             'detail' => $detail
-        ]);
+        ]); 
     }
 }
